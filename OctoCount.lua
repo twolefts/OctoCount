@@ -1,9 +1,3 @@
-local octo = (TargetHPText or TargetHPPercText)
-if not octo then
-    DEFAULT_CHAT_FRAME:AddMessage("|cffa050ffOcto|cffe6b300Count|r: This addon will only function correctly for Octo WoW.")
-    return
-end
-
 local BACKDROP = {
     bgFile = "Interface\\Tooltips\\UI-Tooltip-Background",
     edgeFile = "Interface\\Tooltips\\UI-Tooltip-Border",
@@ -89,6 +83,9 @@ local highCount
 local lowCount
 local queried
 local queriedTime = 0
+local queryMatched
+local disabled
+local validated
 local QUERY_TIMEOUT = 5
 local SERIES = {
     minute = { key = "minutes", seconds = 60, limit = 120, format = "%d %b %Y %H:%M", tooltip = "Players online" },
@@ -224,9 +221,9 @@ function OctoCount:GetDayData(day, interval)
     return data
 end
 
-local Loader = CreateFrame("Frame")
-Loader:RegisterEvent("ADDON_LOADED")
-Loader:SetScript("OnEvent", function()
+local Controller = CreateFrame("Frame")
+Controller:RegisterEvent("ADDON_LOADED")
+Controller:SetScript("OnEvent", function()
     if arg1 == "OctoCount" then
         InitializeDatabase()
         this:UnregisterEvent("ADDON_LOADED")
@@ -485,6 +482,12 @@ local function UpdateCount(online, maximum)
     maxCount = tonumber(maximum)
     if not onlineCount or not maxCount then return end
 
+    if not validated then
+        validated = true
+        OctoCount:Show()
+        DEFAULT_CHAT_FRAME:AddMessage("|cffa050ffOcto|rCount Loaded!")
+    end
+
     OctoCount:StoreCount(onlineCount)
     OctoCount:UpdateText(onlineCount)
 
@@ -507,10 +510,22 @@ function OctoCount:UpdateText(count)
     OctoCount:SetWidth(27 + math.ceil(OctoCount.text:GetStringWidth()))
 end
 
+function OctoCount:Disable(reason)
+    if disabled then return end
+    disabled = true
+    queried = nil
+    Controller:SetScript("OnUpdate", nil)
+    self:Hide()
+    Graph:Hide()
+    DEFAULT_CHAT_FRAME:AddMessage("|cffa050ffOcto|cffe6b300Count|r: " .. reason)
+end
+
 function OctoCount:ServerInfo()
+    if disabled then return end
     SendChatMessage(".server info")
-    queriedTime = GetTime() 
-    queried = true    
+    queriedTime = GetTime()
+    queried = true
+    queryMatched = nil
 end
 
 -- Example of Octo WoW .server info
@@ -521,27 +536,40 @@ end
 local HookChatFrame_OnEvent = ChatFrame_OnEvent
 function ChatFrame_OnEvent(event)    
     if event == "CHAT_MSG_SYSTEM" and queried then
-        if GetTime() - queriedTime > QUERY_TIMEOUT then
-            queried = nil
-        else
-            local _, _, online = string.find(arg1, "Players online:%s*(%d+)")
-            local _, _, maximum = string.find(arg1, "Max online:%s*(%d+)")
+        if string.find(arg1, "^Players online:") then
+            local _, _, online, maximum = string.find(arg1, "^Players online:%s*(%d+).-Max online:%s*(%d+)")
 
             if online and maximum then
+                queryMatched = true
                 UpdateCount(online, maximum)
-                return
-            elseif string.find(arg1, "^Server uptime:") then
-                return
-            elseif string.find(arg1, "^Server Time:") then
-                queried = nil
-                return
+            else
+                OctoCount:Disable("The .server info response format is not supported.")
             end
+            return
+        elseif string.find(arg1, "^Server uptime:") then
+            return
+        elseif string.find(arg1, "^Server Time:") then
+            queried = nil
+            if not queryMatched then
+                OctoCount:Disable("The .server info response did not include a player count.")
+            end
+            return
         end
     end
     HookChatFrame_OnEvent(event)
 end
 
-OctoCount:SetScript("OnUpdate", function()
+Controller:SetScript("OnUpdate", function()
+    if queried then
+        if GetTime() - queriedTime > QUERY_TIMEOUT then
+            queried = nil
+            if not queryMatched then
+                OctoCount:Disable("No compatible .server info response was received.")
+            end
+        end
+        return
+    end
+
     refreshRemaining = refreshRemaining - arg1
     if refreshRemaining <= 0 then
         OctoCount:ServerInfo()
@@ -563,6 +591,3 @@ OctoCount:SetScript("OnLeave", HideTooltip)
 
 OctoCount:Position()
 OctoCount:UpdateText(0)
-OctoCount:Show()
-
-DEFAULT_CHAT_FRAME:AddMessage("|cffa050ffOcto|rCount Loaded!")
