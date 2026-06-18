@@ -48,8 +48,8 @@ SetSize(OctoCount, 36, 23)
 ApplyBackdrop(OctoCount, .4, .4, .4, 1)
 
 OctoCount:SetClampedToScreen(true)
-OctoCount:SetUserPlaced(true)
 EnableDragging(OctoCount, true)
+OctoCount:SetUserPlaced(true)
 OctoCount:RegisterForClicks("LeftButtonUp", "RightButtonDown")
 OctoCount:SetScript("OnClick", function()
     if (arg1 == "RightButton" and IsControlKeyDown()) then

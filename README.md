@@ -6,5 +6,5 @@ Click a bar in the Days view to inspect that date using 1, 5, 15, 30, or 60 minu
 History is kept separately for each realm for 30 days in WoW's `OctoCountDB` saved variable.    
 Overview data uses compact rolling buckets. Per-realm minute values are retained so any saved day can be inspected at different intervals.    
 Each realm is stored directly under its realm name, for example `OctoCountDB["Realm Name"]`.    
-You can move the display by dragging while holding CTRL and SHIFT.    
-To reset the position of the display, right click the display while holding CTRL and SHIFT.    
+You can move the display by dragging while holding CTRL.    
+To reset the position of the display, right click the display while holding CTRL.    
