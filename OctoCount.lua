@@ -243,7 +243,7 @@ Graph.points = {}
 
 Graph.title = Graph:CreateFontString(nil, "OVERLAY", "GameFontNormal")
 Graph.title:SetPoint("TOP", Graph, "TOP", 0, -12)
-Graph.title:SetText("Octopi Online History")
+Graph.title:SetText("Players Online History")
 
 Graph.titleLine = Graph:CreateTexture(nil, "ARTWORK")
 Graph.titleLine:SetTexture(.9, .8, .5, .65)
@@ -356,7 +356,7 @@ function OctoCount:DrawGraph()
         Graph.backButton:Show()
     else
         data = OctoCount:GetGraphData(Graph.mode)
-        Graph.title:SetText("Octopi Online - " .. (currentRealm or "Unknown Realm"))
+        Graph.title:SetText("Players Online - " .. (currentRealm or "Unknown Realm"))
         Graph.backButton:Hide()
     end
 
