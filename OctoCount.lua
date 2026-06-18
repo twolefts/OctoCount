@@ -4,32 +4,58 @@ if not octo then
     return
 end
 
+local BACKDROP = {
+    bgFile = "Interface\\Tooltips\\UI-Tooltip-Background",
+    edgeFile = "Interface\\Tooltips\\UI-Tooltip-Border",
+    tile = true, tileSize = 8, edgeSize = 16,
+    insets = { left = 3, right = 3, top = 3, bottom = 3 }
+}
+
+local function SetSize(frame, width, height)
+    frame:SetWidth(width)
+    frame:SetHeight(height)
+end
+
+local function ApplyBackdrop(frame, red, green, blue, alpha)
+    frame:SetBackdrop(BACKDROP)
+    frame:SetBackdropBorderColor(.9, .8, .5, 1)
+    frame:SetBackdropColor(red, green, blue, alpha)
+end
+
+local function EnableDragging(frame, controlOnly)
+    frame:SetMovable(true)
+    frame:EnableMouse(true)
+    frame:RegisterForDrag("LeftButton")
+    frame.controlDrag = controlOnly
+    frame:SetScript("OnDragStart", function()
+        if not this.controlDrag or IsControlKeyDown() then
+            this:StartMoving()
+        end
+    end)
+    frame:SetScript("OnDragStop", function() this:StopMovingOrSizing() end)
+end
+
+local function CreatePanelButton(parent, text, width)
+    local button = CreateFrame("Button", nil, parent, "UIPanelButtonTemplate")
+    SetSize(button, width, 20)
+    button:SetText(text)
+    return button
+end
+
+local function HideTooltip()
+    GameTooltip:Hide()
+end
+
 local OctoCount = CreateFrame("Button", "OctoCount", Minimap)
 OctoCount:Hide()
 OctoCount:SetFrameLevel(64)
 OctoCount:SetFrameStrata("MEDIUM")
-OctoCount:SetWidth(36)
-OctoCount:SetHeight(23)
-OctoCount:SetBackdrop({
-  bgFile = "Interface\\Tooltips\\UI-Tooltip-Background",
-  edgeFile = "Interface\\Tooltips\\UI-Tooltip-Border",
-  tile = true, tileSize = 8, edgeSize = 16,
-  insets = { left = 3, right = 3, top = 3, bottom = 3 }
-})
-OctoCount:SetBackdropBorderColor(.9,.8,.5,1)
-OctoCount:SetBackdropColor(.4,.4,.4,1)
+SetSize(OctoCount, 36, 23)
+ApplyBackdrop(OctoCount, .4, .4, .4, 1)
 
-OctoCount:SetMovable(true)
 OctoCount:SetClampedToScreen(true)
 OctoCount:SetUserPlaced(true)
-OctoCount:EnableMouse(true)
-OctoCount:RegisterForDrag("LeftButton")
-OctoCount:SetScript("OnDragStart", function() 
-    if (IsControlKeyDown()) then
-        this:StartMoving()
-    end
-end)
-OctoCount:SetScript("OnDragStop", function() this:StopMovingOrSizing() end)
+EnableDragging(OctoCount, true)
 OctoCount:RegisterForClicks("LeftButtonUp", "RightButtonDown")
 OctoCount:SetScript("OnClick", function()
     if (arg1 == "RightButton" and IsControlKeyDown()) then
@@ -52,8 +78,7 @@ OctoCount.text:SetFontObject(GameFontWhite)
 OctoCount.text:SetText("0")
 
 OctoCount.icon = OctoCount:CreateTexture(nil, 'ARTWORK')
-OctoCount.icon:SetWidth(13)
-OctoCount.icon:SetHeight(13)
+SetSize(OctoCount.icon, 13, 13)
 OctoCount.icon:SetPoint("LEFT", OctoCount, "LEFT", 5, 0)
 OctoCount.icon:SetTexture("Interface\\Addons\\OctoCount\\img\\octo.tga")
 
@@ -209,23 +234,11 @@ Loader:SetScript("OnEvent", function()
 end)
 
 local Graph = CreateFrame("Frame", "OctoCountGraph", UIParent)
-Graph:SetWidth(380)
-Graph:SetHeight(270)
+SetSize(Graph, 380, 270)
 Graph:SetPoint("CENTER", UIParent, "CENTER", 0, 0)
 Graph:SetFrameStrata("DIALOG")
-Graph:SetMovable(true)
-Graph:EnableMouse(true)
-Graph:RegisterForDrag("LeftButton")
-Graph:SetScript("OnDragStart", function() this:StartMoving() end)
-Graph:SetScript("OnDragStop", function() this:StopMovingOrSizing() end)
-Graph:SetBackdrop({
-    bgFile = "Interface\\Tooltips\\UI-Tooltip-Background",
-    edgeFile = "Interface\\Tooltips\\UI-Tooltip-Border",
-    tile = true, tileSize = 8, edgeSize = 16,
-    insets = { left = 3, right = 3, top = 3, bottom = 3 }
-})
-Graph:SetBackdropColor(.05, .05, .05, .95)
-Graph:SetBackdropBorderColor(.9, .8, .5, 1)
+EnableDragging(Graph)
+ApplyBackdrop(Graph, .05, .05, .05, .95)
 Graph:Hide()
 Graph.mode = "minute"
 Graph.interval = 60
@@ -251,41 +264,33 @@ Graph.timeLabel:SetPoint("BOTTOM", Graph, "BOTTOM", 0, 10)
 Graph.close = CreateFrame("Button", nil, Graph, "UIPanelCloseButton")
 Graph.close:SetPoint("TOPRIGHT", Graph, "TOPRIGHT", -3, -3)
 
-Graph.minuteButton = CreateFrame("Button", nil, Graph, "UIPanelButtonTemplate")
-Graph.minuteButton:SetWidth(65)
-Graph.minuteButton:SetHeight(20)
-Graph.minuteButton:SetPoint("TOPLEFT", Graph, "TOPLEFT", 12, -40)
-Graph.minuteButton:SetText("Minutes")
-Graph.minuteButton:SetScript("OnClick", function()
-    Graph.mode = "minute"
-    OctoCount:DrawGraph()
-end)
+local GRAPH_MODES = {
+    { text = "Minutes", mode = "minute" },
+    { text = "Hours", mode = "hour" },
+    { text = "Days", mode = "day" }
+}
+Graph.modeButtons = {}
+local modeAnchor
+local modeIndex
+for modeIndex = 1, table.getn(GRAPH_MODES) do
+    local mode = GRAPH_MODES[modeIndex]
+    local button = CreatePanelButton(Graph, mode.text, 65)
+    if modeAnchor then
+        button:SetPoint("LEFT", modeAnchor, "RIGHT", 4, 0)
+    else
+        button:SetPoint("TOPLEFT", Graph, "TOPLEFT", 12, -40)
+    end
+    button.mode = mode.mode
+    button:SetScript("OnClick", function()
+        Graph.mode = this.mode
+        OctoCount:DrawGraph()
+    end)
+    Graph.modeButtons[modeIndex] = button
+    modeAnchor = button
+end
 
-Graph.hourButton = CreateFrame("Button", nil, Graph, "UIPanelButtonTemplate")
-Graph.hourButton:SetWidth(65)
-Graph.hourButton:SetHeight(20)
-Graph.hourButton:SetPoint("LEFT", Graph.minuteButton, "RIGHT", 4, 0)
-Graph.hourButton:SetText("Hours")
-Graph.hourButton:SetScript("OnClick", function()
-    Graph.mode = "hour"
-    OctoCount:DrawGraph()
-end)
-
-Graph.dayButton = CreateFrame("Button", nil, Graph, "UIPanelButtonTemplate")
-Graph.dayButton:SetWidth(65)
-Graph.dayButton:SetHeight(20)
-Graph.dayButton:SetPoint("LEFT", Graph.hourButton, "RIGHT", 4, 0)
-Graph.dayButton:SetText("Days")
-Graph.dayButton:SetScript("OnClick", function()
-    Graph.mode = "day"
-    OctoCount:DrawGraph()
-end)
-
-Graph.backButton = CreateFrame("Button", nil, Graph, "UIPanelButtonTemplate")
-Graph.backButton:SetWidth(45)
-Graph.backButton:SetHeight(20)
+Graph.backButton = CreatePanelButton(Graph, "Back", 45)
 Graph.backButton:SetPoint("TOPLEFT", Graph, "TOPLEFT", 12, -66)
-Graph.backButton:SetText("Back")
 Graph.backButton:SetScript("OnClick", function()
     Graph.mode = "day"
     OctoCount:DrawGraph()
@@ -296,9 +301,7 @@ Graph.detailButtons = {}
 local detailAnchor = Graph.backButton
 local detailIndex
 for detailIndex = 1, table.getn(DETAIL_INTERVALS) do
-    local detailButton = CreateFrame("Button", nil, Graph, "UIPanelButtonTemplate")
-    detailButton:SetWidth(42)
-    detailButton:SetHeight(20)
+    local detailButton = CreatePanelButton(Graph, "", 42)
     detailButton:SetPoint("LEFT", detailAnchor, "RIGHT", 3, 0)
     detailButton.interval = DETAIL_INTERVALS[detailIndex]
     if detailButton.interval == 60 then
@@ -313,6 +316,38 @@ for detailIndex = 1, table.getn(DETAIL_INTERVALS) do
     detailButton:Hide()
     Graph.detailButtons[detailIndex] = detailButton
     detailAnchor = detailButton
+end
+
+local function GraphPointOnEnter()
+    GameTooltip:ClearLines()
+    GameTooltip:SetOwner(this, ANCHOR_RIGHT)
+    GameTooltip:AddLine(date(this.dateFormat, this.timestamp))
+    GameTooltip:AddDoubleLine(this.tooltip, OctoCount.Commas(this.count) .. " players", 1, 1, 1, 1, 1, 1)
+    if this.mode == "day" then
+        GameTooltip:AddLine("Click to inspect this day", .9, .8, .5)
+    end
+    GameTooltip:Show()
+end
+
+local function GraphPointOnClick()
+    if this.mode == "day" then
+        GameTooltip:Hide()
+        Graph.selectedDay = this.timestamp
+        Graph.mode = "detail"
+        OctoCount:DrawGraph()
+    end
+end
+
+local function CreateGraphPoint()
+    local point = CreateFrame("Button", nil, Graph)
+    point:RegisterForClicks("LeftButtonUp")
+    point.texture = point:CreateTexture(nil, "ARTWORK")
+    point.texture:SetAllPoints(point)
+    point.texture:SetTexture(.63, .31, 1)
+    point:SetScript("OnEnter", GraphPointOnEnter)
+    point:SetScript("OnLeave", HideTooltip)
+    point:SetScript("OnClick", GraphPointOnClick)
+    return point
 end
 
 function OctoCount:DrawGraph()
@@ -380,30 +415,7 @@ function OctoCount:DrawGraph()
     for i = 1, count do
         local point = Graph.points[i]
         if not point then
-            point = CreateFrame("Button", nil, Graph)
-            point:RegisterForClicks("LeftButtonUp")
-            point.texture = point:CreateTexture(nil, "ARTWORK")
-            point.texture:SetAllPoints(point)
-            point.texture:SetTexture(0.63, 0.31, 1)
-            point:SetScript("OnEnter", function()
-                GameTooltip:ClearLines()
-                GameTooltip:SetOwner(this, ANCHOR_RIGHT)
-                GameTooltip:AddLine(date(this.dateFormat, this.timestamp))
-                GameTooltip:AddDoubleLine(this.tooltip, OctoCount.Commas(this.count) .. " players", 1, 1, 1, 1, 1, 1)
-                if this.mode == "day" then
-                    GameTooltip:AddLine("Click to inspect this day", .9, .8, .5)
-                end
-                GameTooltip:Show()
-            end)
-            point:SetScript("OnLeave", function() GameTooltip:Hide() end)
-            point:SetScript("OnClick", function()
-                if this.mode == "day" then
-                    GameTooltip:Hide()
-                    Graph.selectedDay = this.timestamp
-                    Graph.mode = "detail"
-                    OctoCount:DrawGraph()
-                end
-            end)
+            point = CreateGraphPoint()
             Graph.points[i] = point
         end
         local x
@@ -415,8 +427,7 @@ function OctoCount:DrawGraph()
         local height = 3 + ((data[i].count - minimum) / range) * (plotHeight - 3)
         point:ClearAllPoints()
         point:SetPoint("BOTTOMLEFT", Graph, "BOTTOMLEFT", x, plotBottom)
-        point:SetWidth(pointWidth)
-        point:SetHeight(height)
+        SetSize(point, pointWidth, height)
         point.timestamp = data[i].time
         point.count = data[i].count
         point.mode = Graph.mode
@@ -548,9 +559,7 @@ OctoCount:SetScript("OnEnter", function()
     GameTooltip:Show()
 end)
 
-OctoCount:SetScript("OnLeave", function()
-    GameTooltip:Hide()
-end)
+OctoCount:SetScript("OnLeave", HideTooltip)
 
 OctoCount:Position()
 OctoCount:UpdateText(0)
