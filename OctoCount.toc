@@ -1,0 +1,8 @@
+## Interface: 11200
+## Title: |cffa050ffOcto|cffffffffCount
+## Author: Prime
+## Notes: Displays the number of Octopi online 
+## Version: 2
+## SavedVariables: OctoCountDB
+
+OctoCount.lua
